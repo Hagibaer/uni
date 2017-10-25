@@ -5,6 +5,7 @@ class(a)
 class(b) == 'character'
 a^2 + 1/b
 sqrt(a*b)
+log2(a)
 
 # Matrix algebra
 A = matrix(c(1,4,7,2,5,8,3,6,10), nrow=3)
@@ -27,6 +28,7 @@ A[3,2] * B[2,1]
 A[1,] * B[,3]
 y[y>1]
 A[,2][A[,1] >= 4]
+# A[4,]
 
 # Custom function
 standardize = function(x) {
