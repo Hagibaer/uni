@@ -1,53 +1,57 @@
-# Variables and Classes
-a <- 3.0
-b <- 4.5
-class(a)
-class(b) == 'character'
-a^2 + 1/b
-sqrt(a*b)
-log2(a)
+# variables and classes
+a = 3.0
+b = 4.5
+class Class():
+    def __init__(self, name):
+        self.name = name
+        
+    def __repr__(self):
+        return str(self.name)
+print(Class(a))
+print(Class(b) == "character")
+print(a**2 + 1/b)
+import math
+print(math.sqrt(a*b))
+print(math.log2(a))
 
 # Matrix algebra
-A = matrix(c(1,4,7,2,5,8,3,6,10), nrow=3)
-B = matrix(c(1:9), nrow=3)
-y = matrix(c(1:3))
+import numpy as np
 
-a * A
-A %*% B
-invA = solve(A)
-A %*%invA
-t(B)
-B[1,] = c(1,1,1)
-ols = function(A, y) solve(t(A)%*%A)%*%t(A)%*%y
-ols(A, y)
+A = np.array([1, 4, 7, 2, 5, 8, 3, 6, 10]).reshape(3, -1)
+B = np.arange(1, 10).reshape(3, -1)
+y = np.arange(1, 4)
 
+print(a*A)
+print(np.dot(A, B))
+invA = np.linalg.inv(A)
+print(np.dot(A, invA))
+print(B.T)
+B[1, :] = [1, 1, 1]
+print(B)
 
 # Indexing
-# A B y (anzeigen)
-A[3,2] * B[2,1]
-A[1,] * B[,3]
-y[y>1]
-A[,2][A[,1] >= 4]
-# A[4,]
+print(A[2, 1] * B[1, 0])
+print(A[0,:] * B[:,2])
+print(y[y>1])
+print(A[:,1][A[:,0] >= 4])
 
-# Custom function
-standardize = function(x) {
-  if (is.numeric(x)){
-    mu = mean(x)
-    std = sd(x) 
-    return((x - mu) / std)
-  }
-  else{
-    return(x)
-  }
-}
+def standardize(x):
+    if isinstance(x ,np.ndarray):
+        mu = np.mean(x)
+        std = np.std(x)
+        return ((x-mu)/std)
+    else:
+        return x
 
-a = c(-100, -25, -10, 0, 10, 25, 100)
+a = np.array([-100, -25, -10, 0, 10, 25, 100])
+
 standardize(a)
-
-# Using inbuilt-functions
-dnorm(x = c(1,2,3,6))
-x = seq(-2,2, by=0.2)
-nvValues = dnorm(x, mean = 0, sd = 1)
-plot(x = x, y = nvValues, type='l')
-
+from scipy.stats import norm
+norm.pdf([1, 2, 3, 6])
+x = np.arange(-2, 2, 0.2)
+nvValues = norm.pdf(x, loc=0, scale=1)
+from matplotlib import pyplot as plt
+import seaborn as sns
+sns.set()
+plt.plot(x, nvValues)
+plt.show()
