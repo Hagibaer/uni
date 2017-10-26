@@ -14,7 +14,7 @@ tasks that I will have to do.
 
    This module will target the topics of text-mining, probably using Python.
   
-3. ML (Maschine Learning; empty for now)
+3. ML (Machine Learning)
 
      This module will be focusing on the topic of supervised and some unsupervised learning models and their implementations in
      jupyter-notebooks. The code will most likely will be written in Python.
