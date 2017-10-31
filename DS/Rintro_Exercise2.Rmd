@@ -1,0 +1,198 @@
+---
+title: "Exercise 2"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+# NEED FOR CHANGE ---- 
+# Note that this code will not work on your computer. 
+wdir <- getwd()
+
+# You can uncomment the next line and specify the directory for the exercise on your computer
+# wdir <- "C://Your/own/path"
+# End of NEED FOR CHANGE ----
+
+# knitr::opts_knit$set(root.dir = wdir)
+# results = c("all", "hide")
+knitr::opts_chunk$set(echo = TRUE, results = 'all', message = FALSE, warning = FALSE, fig.keep = 'all', cache = FALSE)
+options(repos=c(CRAN = "https://cran.uni-muenster.de/"))
+```
+
+# Object classes II
+## Lists
+Lists can store any type of object including other lists. Think of them as the box in the kitchen where you put everything that doesn't fit elsewhere. It's usually more convenient to use more structured boxes, but sometimes you just need a place to put things.    
+The only thing new is that lists can be indexed in two ways:
+
+- **[i]** returns a list of elements. i can be an integer or a vector **[i:j]**, just like when indexing vector.
+- **[[i]]** returns a single element. i can only be a single value.
+    
+Because lists can take on complicated structures, function **str()** is a convenient tool to get an overview of a list's content. Try using it on the other objects, too.
+```{r}
+x <- 10
+y <- 10:15
+z <- c("hello", "bye")
+example <- function() print("example")
+
+l <- list(x, y, z, example)
+l
+str(l) # Summarize the structure of a list
+
+# List indexing
+# [ ] returns a list
+l[1:2]
+l[2]
+# [[ ]] returns a single list element
+l[[2]]
+```
+
+## Data frames
+Data frames are a special type of list, although they might not look like it. They are a list of vectors (so the vectors can have different types) with the same length. Think of them as the 'excel table' of objects.    
+Just like an excel table, we usually assign names to the columns and sometimes rows. These names are not part of the values inside the data frame (unlike, for example, in an excel table). The names can also be used to index by name rather than by position.    
+Data frames are lists, but they are also two (or more)-dimensional, so we can index them like a matrix to get specific rows or columns.
+```{r}
+# All columns in the data.frame have to have the same length
+# But they can have different classes
+x <- 1:5
+y <- seq(from = 1, to = 10, by = 2)
+z <- c("a", "b", "c", "d", "e")
+
+# Create a data.frame
+df <- data.frame(x, y, z)
+df
+df <- data.frame("column1" = x, "column2" = y, z)
+df
+
+# We can reassign names, just like we reassigned dimensions
+colnames(df) <- c("variable1", "variable2", "variable3")
+rownames(df) <- c("obs1", "obs2", "obs3", "obs4", "obs5")
+df
+
+# Indexing data frames
+# By position
+df[1:2,]
+df[,2:3]
+df[,2]
+# By name...
+df[c("obs4", "obs5"), c("variable1", "variable2")]
+# ...with a shortcut $ for selecting one column by name
+df$variable2
+df["variable2"]
+
+# Calculating the mean of variable 2
+mean(df$variable2) 
+```
+
+## Working directory
+When interacting with files on your computer, you can always specify the full path to the file. If you don't, then R will search for the file at a default location called the *working directory*. You can set this to any location for convenience.     
+Note: RMarkdown sets the working directory to the directory of the document by default and avoids permanent changes. 
+```{r}
+# You can check which directory is the current working directory
+getwd()
+# This is the location where the file was saved in the previous chunk...
+
+# You can set the working directory to any location for convenience
+#setwd(C:\\Project folder/Amazing project/Believe me)
+
+# Aside: The directory is evaluated in the same way as in the command line. 
+# For example, ".." can be used to 'jump up' on level.
+setwd("..")
+getwd()
+```
+
+# Saving/Loading data
+Data is typically shared as a comma-separated list (.csv). Loading from and saving to this format can be done with the **write.csv()** and **read.csv()** functions. Aside from stating the file, several additional arguments can be used to correctly identify its formatting. The most important are define the separator and if the column names are given in the first row.    
+All R objects can also be saved as-they-are in .rds format using functions **saveRDS()** and **readRDS()**. This can be useful when saving less structured objects like lists.    
+Don't forget to check your data for consistency and correct formatting. Two practical functions for this are **str()**, which we know, and **summary()**.
+```{r}
+# Loading data from a csv file
+loans <- read.csv("loan_data.csv", sep = ";", header = TRUE)
+# Check for consistency
+str(loans)
+# Saving the data in .rds format.
+saveRDS(loans, "loan_data.rds")
+```
+
+
+# Code flow control
+Humans tend to be lazy and make mistakes. When we want to do something more than one time or to several different objects, we therefore want to keep the code as simple as possible. Fortunately, there are several ways to control the flow of our code. 
+
+## If/Else 
+Function **if()** checks if a condition is TRUE. If it is, the specified code is run. If not, either nothing happens or some other code, specified with **else**, is run.    
+if(condition){
+  operation if the condition is valid
+  }else{
+   alternative operation}
+   
+Note that the curly brackets **{ }** are not part of the function, but are a convenient way to group statements. Here, we use them to tell R that we want it to run several lines of code.
+```{r}
+a <- 2
+
+if(a == 2) print("2. Great number.")
+
+# Use an if-condition to check the size of a
+if(a < 10){
+  print("Value smaller than 10")
+}else{
+ print("Value larger than 10")
+}
+
+```
+
+## Loops
+We have seen how we can define several calls into a function and can run code if a condition is fulfilled with **if()**. The last missing tool, the *loop*, will help us to do one thing repeatedly, possibly with changing arguments.    
+For example, in the data that we loaded there are several numeric variables that we standardize for statistical reasons. We can do this by hand for each variable with our custom function **standardize()**, but will need to copy/paste and make typos. Plus, our mothers have raised us to be tidy with our code!   
+So we will automate the code to go over the categorical variables in turn and standardize them when appropriate. We cannot standardize character or factor variables, because they are not numbers. For the purpose of the exercise, we ignore that there are binary 0/1 variables in the data.
+```{r}
+# Create a function standardize as before
+standardize <- function(x){
+    # The actual calculations necessary to standardize the values
+    mu <- mean(x)
+    std <- sd(x)
+    result <- (x - mu)/std
+    # Return ends the function and outputs the result
+    return(result)
+    
+    # A list can be returned to output more than one result
+    #return(list("mean" = mu, "sd" = std, "output" = result))
+}
+# Create a vector with the names of the numeric variables
+numericVars <- c("YOB", "nKIDS", "nDEP", "dINC_SP", "dINC_A", "dHVAL", "dMBO", "dOUTM", "dOUTL", "dOUTHP", "dOUTCC")
+
+# Let's try looping:
+# Think: For i taking on each value in the vector do ...
+for(name in numericVars) print(name)
+# Let's try it with the data
+for(name in numericVars) standardize(loans[, name]) 
+mean(loans$dINC_SP) # This should now be zero! Nothing happened!
+# We need to *save* the results during each iteration!
+for(name in numericVars) loans[, name] <- standardize(loans[, name]) 
+# Check the result
+mean(loans$dINC_SP)
+sd(loans$dINC_SP)
+```
+
+## The apply family
+To loop over the numeric variables, we looked at the structure of the data frame and made a list manually. That is another step that we could automate to have more break time.
+R has simplifying, optimized functions to loop over the values of an object and return the results in a structured form called the *apply* family. They are used to apply one function to several elements (rows/columns for apply, vectors/lists for the others). Let's see if we can standardize all of the numeric variables in the data using the custom function that you build in the homework exercises.    
+In the first step, we want to check for every variable if it is numeric. To do so, we'd like to apply function *is.numeric()* to every column in the data frame. 
+Then, we will apply function standardize to these variables.
+```{r}
+# Since our standardize function can't handle factor variables, we
+# have to select all numeric variables first
+num_vars_list <- lapply(loans, is.numeric) # Lists cannot used to index, so we'd like a vector in return
+class(num_vars_list)
+num_vars <- sapply(loans, is.numeric) # sapply simplifies the result list, if possible
+num_vars
+# Let's test this first
+test <- sapply(loans[,num_vars], FUN = standardize)
+str(test)
+# And use it to update the correct columns in our data frame
+# The second argument in apply specifies a loop over the rows (1) or columns (2)
+loans[,num_vars] <- apply(loans[,num_vars], 2, FUN = standardize)
+
+# Let's look at the 'final' data set
+summary(loans)
+
+```
