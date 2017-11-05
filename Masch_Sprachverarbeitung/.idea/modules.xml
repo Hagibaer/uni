@@ -2,8 +2,7 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/.idea/modules/masch_sprachverarbeitung.iml" filepath="$PROJECT_DIR$/.idea/modules/masch_sprachverarbeitung.iml" />
-      <module fileurl="file://$PROJECT_DIR$/.idea/modules/masch_sprachverarbeitung-build.iml" filepath="$PROJECT_DIR$/.idea/modules/masch_sprachverarbeitung-build.iml" />
+      <module fileurl="file://$PROJECT_DIR$/Masch_Sprachverarbeitung.iml" filepath="$PROJECT_DIR$/Masch_Sprachverarbeitung.iml" />
     </modules>
   </component>
 </project>
