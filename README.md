@@ -12,7 +12,7 @@ tasks that I will have to do.
   
 2. Masch_Sprachverarbeitung
 
-   This module will target the topics of text-mining. For now it seems like the code will be written in Scala.
+   This module will target the topics of text-mining. First task was solved in Java, hence this will probably stay the language for the course now.
   
 3. ML (Machine Learning)
 
