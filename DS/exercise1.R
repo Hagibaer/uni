@@ -8,7 +8,7 @@ sqrt(a*b)
 log2(a)
 
 # Matrix algebra
-A = matrix(c(1,4,7,2,5,8,3,6,10), nrow=3)
+A = matrix(c(1:8, 10), nrow=3, byrow=TRUE)
 B = matrix(c(1:9), nrow=3)
 y = matrix(c(1:3))
 
