@@ -10,9 +10,9 @@ tasks that I will have to do.
 
    This module will deal with building a prediction model using R.
   
-2. Masch_Sprachverarbeitung (not there yet, because its empty)
+2. Masch_Sprachverarbeitung
 
-   This module will target the topics of text-mining, probably using Python.
+   This module will target the topics of text-mining. First task was solved in Java, hence this will probably stay the language for the course now.
   
 3. ML (Machine Learning)
 
