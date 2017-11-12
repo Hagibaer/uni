@@ -29,3 +29,9 @@ mean_bad = mean(inc.bad)
 difference = mean_good - mean_bad
 result = t.test(inc.good, inc.bad)
 print(result$p.value) # is small and therefore significant yaayy \o/
+
+# Apply function standardize to all numeric value
+idx.numvar <- sapply(loan, is.numeric)
+tmp <- sapply(loan[, idx.numvar], standardize)
+summary(tmp)
+
