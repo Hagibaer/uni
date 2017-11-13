@@ -7,6 +7,7 @@ import java.io.UnsupportedEncodingException;
 
 public class ReuterHandler extends DefaultHandler{
     private int numArticles = 0;
+    private String text = "";
     private boolean title = false;
     private boolean body = false;
     private boolean people = false;
@@ -51,10 +52,14 @@ public class ReuterHandler extends DefaultHandler{
     @Override
     public void endElement(String uri, String localName, String qName) throws SAXException {
         if(qName.equalsIgnoreCase("title")){
+            this.titleBodyCounter.count(this.text);
             title = false;
+            text = "";
         }
         if(qName.equalsIgnoreCase("body")){
+            this.titleBodyCounter.count(this.text);
             body = false;
+            text = "";
         }
         if(qName.equalsIgnoreCase("topics")){
             topic = false;
@@ -70,11 +75,10 @@ public class ReuterHandler extends DefaultHandler{
     @Override
     public void characters(char[] ch, int start, int length) throws SAXException {
         if(title){
-            this.titleBodyCounter.count(new String(ch, start, length));
-
+            this.text += new String(ch, start, length);
         }
         if(body){
-            this.titleBodyCounter.count(new String(ch, start, length));
+            this.text += new String(ch, start, length);
         }
         if(topic){
             this.TopicsCounter.count(new String(ch, start, length));

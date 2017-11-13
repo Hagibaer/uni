@@ -10,6 +10,7 @@ import java.util.*;
 public class Main {
 
     public static void main(String[] args) {
+        long startTime = System.nanoTime();
         try{
             File directory = new File("corpus/reference-corpus");
 
@@ -45,9 +46,11 @@ public class Main {
             // Assuming most common words and their count is only done within title & body
             System.out.println("Most common words: ");
             reuterHandler.getMostCommonWords();
-
         }catch (Exception e){
             e.printStackTrace();
         }
+        long endTime = System.nanoTime();
+
+        System.out.println("Total Time: "+ ((endTime-startTime)/1000000));
     }
 }

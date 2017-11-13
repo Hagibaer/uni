@@ -14,6 +14,7 @@ public class WordCounter
     }
 
     private String[] sanitize(String input){
+        input = input.trim();
         input = input.toLowerCase();
         String [] tokens = input.split("\\s+");
         return tokens;
@@ -22,7 +23,7 @@ public class WordCounter
     public void count(String input){
         String[] words = sanitize(input);
         for(String word: words){
-            if(!word.isEmpty() && !word.equalsIgnoreCase("<")){
+            if(!word.isEmpty()){ // && !word.equalsIgnoreCase("<")){
                 MutableInt count = this.dictionary.get(word);
                 if (count == null){
                     this.dictionary.put(word, new MutableInt());
