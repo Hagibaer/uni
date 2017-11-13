@@ -3,10 +3,13 @@ import org.xml.sax.Attributes;
 import org.xml.sax.SAXException;
 import org.xml.sax.helpers.DefaultHandler;
 
+import java.io.UnsupportedEncodingException;
+
 public class ReuterHandler extends DefaultHandler{
     private int numArticles = 0;
     private boolean title = false;
     private boolean body = false;
+    private boolean people = false;
     private boolean topic = false;
     private boolean places = false;
     private WordCounter titleBodyCounter;
@@ -28,8 +31,10 @@ public class ReuterHandler extends DefaultHandler{
         if(qName.equalsIgnoreCase("reuters")){
             this.numArticles += 1;
         }
-        if(qName.equalsIgnoreCase("title") || qName.equalsIgnoreCase("body")){
+        if(qName.equalsIgnoreCase("title")){
             title = true;
+        }
+        if(qName.equalsIgnoreCase("body")){
             body = true;
         }
         if(qName.equalsIgnoreCase("topics")){
@@ -38,22 +43,47 @@ public class ReuterHandler extends DefaultHandler{
         if(qName.equalsIgnoreCase("places")){
             places = true;
         }
+        if(qName.equalsIgnoreCase("people")){
+            people = true;
+        }
+    }
+
+    @Override
+    public void endElement(String uri, String localName, String qName) throws SAXException {
+        if(qName.equalsIgnoreCase("title")){
+            title = false;
+        }
+        if(qName.equalsIgnoreCase("body")){
+            body = false;
+        }
+        if(qName.equalsIgnoreCase("topics")){
+            topic = false;
+        }
+        if(qName.equalsIgnoreCase("places")){
+            places = false;
+        }
+        if(qName.equalsIgnoreCase("people")){
+            people = false;
+        }
     }
 
     @Override
     public void characters(char[] ch, int start, int length) throws SAXException {
-        if(title || body){
+        if(title){
             this.titleBodyCounter.count(new String(ch, start, length));
-            title = false;
-            body = false;
+
+        }
+        if(body){
+            this.titleBodyCounter.count(new String(ch, start, length));
         }
         if(topic){
-            this.TopicsCounter.countRaw(new String(ch, start, length));
-            topic = false;
+            this.TopicsCounter.count(new String(ch, start, length));
         }
         if(places){
-            this.PlacesCounter.countRaw(new String(ch, start, length));
-            places = false;
+            this.PlacesCounter.count(new String(ch, start, length));
+        }
+        if(people){
+            this.PeopleCounter.count(new String(ch, start, length));
         }
     }
 

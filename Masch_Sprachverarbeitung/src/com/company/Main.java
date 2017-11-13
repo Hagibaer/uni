@@ -11,7 +11,7 @@ public class Main {
 
     public static void main(String[] args) {
         try{
-            File directory = new File("corpus/reuters-corpus");
+            File directory = new File("corpus/reference-corpus");
 
             FilenameFilter xmlFilter = (dir, name) -> {
                 String lowercaseName = name.toLowerCase();

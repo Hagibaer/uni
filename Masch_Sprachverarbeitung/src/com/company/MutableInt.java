@@ -3,7 +3,7 @@ package com.company;
 public class MutableInt implements Comparable<MutableInt>
 {
     int value = 1;
-    public void increment(){++value;}
+    public void increment(){this.value +=1;}
     public int getValue(){return value;}
 
     @Override

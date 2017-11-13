@@ -1,6 +1,7 @@
 package com.company;
 
 
+import java.io.UnsupportedEncodingException;
 import java.security.KeyStore;
 import java.util.*;
 
@@ -14,20 +15,19 @@ public class WordCounter
 
     private String[] sanitize(String input){
         input = input.toLowerCase();
-        String [] sanitizedString = input.split(" ");
-        return sanitizedString;
+        String [] tokens = input.split("\\s+");
+        return tokens;
     }
 
     public void count(String input){
         String[] words = sanitize(input);
-        for(String word : words){
-            if(!word.isEmpty()){
+        for(String word: words){
+            if(!word.isEmpty() && !word.equalsIgnoreCase("<")){
                 MutableInt count = this.dictionary.get(word);
                 if (count == null){
                     this.dictionary.put(word, new MutableInt());
                 } else {
                     count.increment();
-                    this.dictionary.put(word, count);
                 }
             }
         }
@@ -36,7 +36,7 @@ public class WordCounter
     public int getTotalNumberofWords(){
         int result = 0;
         for (MutableInt i : this.dictionary.values()){
-            result += i.value;
+            result += i.getValue();
         }
         return result;
     }
@@ -53,7 +53,7 @@ public class WordCounter
             }
         });
 
-        for(Map.Entry<String, MutableInt> item: list.subList(0,29)){
+        for(Map.Entry<String, MutableInt> item: list.subList(0, 29)){
             System.out.println(item.getKey()+ " ----- " + this.dictionary.get(item.getKey()).getValue());
         }
     }
