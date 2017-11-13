@@ -1,0 +1,287 @@
+---
+title: "Exercise 3"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+# NEED FOR CHANGE ---- 
+# Note that this code will not work on your computer. 
+wdir <- getwd()
+
+# You can uncomment the next line and specify the directory for the exercise on your computer
+# wdir <- "C://Your/own/path"
+# End of NEED FOR CHANGE ----
+
+# knitr::opts_knit$set(root.dir = wdir)
+# results = c("all", "hide")
+knitr::opts_chunk$set(echo = TRUE, results = 'all', message = FALSE, warning = FALSE, fig.keep = 'all', cache = FALSE)
+options(repos=c(CRAN = "https://cran.uni-muenster.de/"))
+```
+
+## Introduction
+When we do predictive modeling, we use an algorithm or *model* to find a relation between some known data, often called *features* or *predictors* and some unknown data, the *target variable*. The most famous of these models is the *linear regression*. Intuitively speaking, it works by finding one value or *coefficient* for each variable, so that multiplying that value with the value of the variable for and summing these all up gives a 'good' prediction of the target variable for an observation, where good is chosen to mean that the *root mean squared error* is low.     
+Because we need multiply and sum up values, the input that we need for the model to work is a matrix (think excel table) of numbers without any text data or missing information. Consequently, the first step in building a model starts with preparing the data. In practice, preparing the data means finding and fixing the mistakes that were made when designing and filling the database and (creatively) translating and breaking down information into pieces that the model understands and can work with easily.
+
+## Factor variables
+While people like to work with words and categories, these need to be transformed to numbers in some way in order to fit into most algorithms. If people enter into a database that their hometown is Berlin, Hamburg or Leipzig, we need a numerical transcription of this information. The standard way to do this is called *dummy encoding*. Instead of one variable **hometown** that contains the city names, the same information can be saved in three variables **Berlin**, **Hamburg**, **Leipzig** that take the value 1, if the person is from the respective city and 0 if the person is from another city. You'll note the disadvantage that the full set of possible values needs to be known, which is usually solved by a variable **Other**.
+
+Person | Hometown | Berlin | Hamburg | Leipzig | Other
+:---   |:---      | :---:  | :---:   | :---:   | :---:
+A      |  Berlin  | 1      | 0       | 0       | 0
+B      |  Leipzig | 0      | 0       | 1       | 0
+
+R has a special class *factor* to make working with categorical variables more convenient by turning them into the above format only when necessary. Function **data.frame()** automatically turns character vectors into factor vectors.   
+
+How does this work? Saving a string in memory takes up more space than saving a number. To save memory space, R assigns a number to every unique string in the vector. It then saves the original vector as a vector of these numbers and remembers which number corresponds to which word, like using student IDs instead of full names and birth dates.    
+Example:
+Imagine a column of town names, for example as part of an address.
+As a character vector it looks like this:    
+(Berlin, Berlin, Hamburg, Leipzig, Stuttgart, Hamburg, Hamburg, Stuttgart)    
+Saving the names as strings takes a lot of memory and is inconvenient for other functions. So we transform it to a factor vector that looks like this:
+(1, 1, 2, 3, 4, 2, 2, 4)    
+and keep track of which number matches which city:    
+1 = Berlin, 2 = Hamburg, 3 = Leipzig, 4 = Stuttgart    
+
+Note: By default the levels are re-ordered (alphabetically) in increasing order.    
+
+When a factor variable is used in a model formula, then R will automatically transform it into the above 1/0 matrix behind the scenes. So be careful when working with many factor levels!
+
+```{r}
+# Create a character vector containing the home towns of 8 persons
+cities <- c("Hamburg", "Berlin", "Berlin", "Leipzig", "Stuttgart", "Hamburg", "Hamburg", "Stuttgart")
+cities
+str(cities)
+# Transform character to factor vector
+cities_factor <- factor(cities)
+cities_factor
+str(cities_factor) # Note that the values are now 2 1 1 3 ...
+```
+
+When you use factors in functions, R will usually give you output that is much more convenient for analysis. But keep in mind that it is good practice to assign convenient names to the factor levels. To be on the safe side, they shouldn't be numbers or contain special characters (including space) when avoidable.
+
+```{r}
+# Create a numeric vector with the street number of 8 persons
+# The vector class is numeric, even though the information is categorical
+street_number <- c(18, 25, 23, 11, 14, 10, 12, 14, 15, 16)
+street_factor <- factor(street_number)
+str(street_factor) # You can see how this can get confusing
+# Warning: Transforming 'number factors' back to numbers is not straight-forward
+as.numeric(street_factor)
+as.numeric(levels(street_factor))[street_factor]
+
+# Create a binary vector (0/1) specifying if the address is an apartment
+apartment <- c(1, 0, 1, 0, 1, 1, 1, 0)
+# We can automatically assign new 'names' for the factor levels
+# WARNING: The original levels are re-sorted in increasing order
+#          Either sort the labels vector by the new order
+factor(apartment, labels = c("house", "apartment"))
+#          Or specify the levels explicitly
+factor(apartment, levels = c(1, 0), labels = c("apartment", "house"))
+
+# Do not do this:
+apartment_naive <- factor(apartment)
+as.numeric(apartment_naive)
+# Can you explain why the 0/1 vector turned to 1/2?
+```
+
+## Data preparation steps
+### Loading and structural checks
+Let's work through a typical data preparation problem by preparing the *loans* dataset for regression.
+1. Load the .csv data file. Be careful to specify the correct formatting and do not transform character variables to factor variables yet. 
+2. Look at the structure of the data and the summary statistics of the numeric variables. Also compare the data to the data dictionary to identify any issues that need treatment.
+3. Now look at the values that the nominal variables take. Check how many unique values that the text variables take and, if not too many, create a *table* telling you how often each level occurs.
+4. There are levels with very few values in variable *EMPS_A*. Check their meaning in the dictionary and, if plausible, combine them into a new category. Try to develop brief code that doesn't require you to copy and paste the same line several times.
+
+```{r}
+# Load the data
+# Be careful to correctly specify the format of the data
+loans <- read.csv("loan_data.csv", sep = ";", stringsAsFactors = FALSE)
+
+# Check the data structure and the individual variables
+str(loans)
+
+# Check the summary statistics
+summary(loans)
+# YOB 99 seems too high
+
+# Unique value of character variables
+str(unique(loans$EMPS_A))
+str(unique(loans$RES))
+
+# Level counts
+table(loans$EMPS_A)
+table(loans$RES)
+
+# Recombine rare variable levels
+# Don't do loans$EMPS_A[loans$EMPS_A == "U"] <- "O" three times! Typos happen and changes will be painful.
+# A nicer solution would be, for example,
+loans$EMPS_A <- ifelse(loans$EMPS_A %in% c("U", "N", "Z"), "O", loans$EMPS_A)
+```
+
+### Treatment of missing values
+Variable Year of Birth (**YOB**) contains missing values. As we can see from the data dictionary, these are coded as *99*. Note that it is bad practice to code missing observations as values that can be easily missed, but that it happens a lot in practice. In R, missing values are denoted as NA (without quotes). While some models can work around missing values, most models will drop the observation completely by default. Let's see if we can do something about this.
+
+1. Replace the value 99 in variable **YOB** with *NA*. You can assign *NA* to a variable like any other value.
+2. The missing values could be the result of a random process (e.g. errors in data input) or be more systematic. For example, some people might prefer to not state their age and will leave the field *Year of Birth* empty on their application. To sustain this information, create a dummy variable **YOB_missing** that is 1 if **YOB** *is NA* and 0 otherwise.
+3. There seems to be no clear way to infer the missing values in variable **YOB** (year of birth) from other data. Since there are few missing values, we could consider deleting the corresponding applicants (rows) from our data. Alternatively, we will replace them by the mode (= most frequent value) for the variable. HINT: Sort the value count of **table()** to find the most common value quickly.
+
+```{r}
+# Replace the missing observations with NA to make it explicit that they are missing
+# R will treat these observations differently from normal values
+loans$YOB[loans$YOB == 99] <- NA 
+summary(loans$YOB)
+# Create a dummy variable YOB_missing with 1 when YOB is na and 0 elsewise
+# Do not use '== NA', since NA is not a normal variable value. Instead, use function is.na
+loans$YOB_missing <- ifelse(is.na(loans$YOB), 1, 0)
+#Check your results by printing the first six values using function head
+head(loans$YOB_missing)
+
+## Find the most frequent value
+# Function table gives a vector with the count of all unique values of YOB (second line) and the names of the values (upper line). We can sort this list using the function sort and look up the most frequent value
+sort(table(loans$YOB))
+countYOB <- table(loans$YOB)
+# Print the names, i.e. unique variable values, and select the value(s) were the count is equal to the highest value.
+names(countYOB)[countYOB == max(countYOB)]
+# The most frequent year of birth is '64.
+# Replace all missing values NA with 64
+loans$YOB[is.na(loans$YOB)] <- 64 
+```
+
+### Transformation of factor variables
+There are two character variables that we cannot put into a model as-is. Why was that again? What was the standard solution mathematically speaking? 
+1. Transform the two character variables into factor variables. Again, don't copy/paste the same line two times, but find a way to automatize the process.
+2. Variable **BAD** specifies if an applicant has defaulted on their loan. It will be convenient later for some functions to transform this variable to a factor variable. Transform **BAD** to factor and relabel it so that "good" indicates no default (0) and "bad" indicates a default (1).
+```{r}
+# There are as usual many ways to do this efficiently
+for(chrVar in c("EMPS_A", "RES")){
+  loans[, chrVar] <- factor(loans[[chrVar]])
+}
+# or with even more automation
+chrIdx <- which(sapply(loans, is.character))
+loans[, chrIdx] <- lapply(
+  loans[, chrIdx],
+  factor
+)
+
+# Convert BAD to factors and relabel its levels
+loans$BAD <- factor(loans$BAD, labels=c("good", "bad"))
+```
+
+### Outlier treatment
+Outliers are variable values that are substantially different (larger or smaller) than other observed values and may have a large impact on the model. They can be occuring naturally (someone just earns millions or nothing) or be an artifact of the data collection, e.g. errors (999) or wrong input (income of -1000). Depending on our understanding of the data, we can drop outliers, delete erroneous values or truncate them to control their impact on model estimation. Note that many of the more sophisticated prediction models are robust against outliers in the predictors, so that extensive treatment often gives little benefit in practice.
+
+For the sake of the exercise, let's assume that we are concerned about outliers in the spouse's income. 
+1. Check the concern with a boxplot of variable **dINC_SP
+2. Create a small function to calculate the z-score of a variable. This is, in fact, the variable standardized by substracting the mean and dividing by the standard deviation. Calculate the z-scores and save them to a variable **zScores**.
+3. Replace all values in **dINC_SP** that lie above a z-score of three by the threshold value three standard deviations above the mean.
+```{r}
+# Boxplot of spouse's income
+summary(loans$dINC_SP)
+boxplot(loans$dINC_SP)
+
+# Calculate the z-score with the function we created earlier for standardization
+standardize <- function(x){
+    # The actual calculations necessary to standardize the values
+    mu <- mean(x)
+    std <- sd(x)
+    result <- (x - mu)/std
+    # Return ends the function and outputs the result
+    return(result)
+    
+    # A list can be returned to output more than one result
+    #return(list("mean" = mu, "sd" = std, "output" = result))
+}
+
+# Calculate and save the z-scores
+zScores <- standardize(loans$dINC_SP)
+summary(zScores)
+
+# Replace the assumed outliers with a threshold value
+loans$dINC_SP[zScores > 3] <- mean(loans$dINC_SP) + 3*sd(loans$dINC_SP)
+
+```
+
+### Simple feature extraction
+The structure of the model restricts how the algorithm can work with the data. In the linear regression case, for example, the assumption that the effects are linear does not allow the model to capture non-linear effects very well. If a persons income tends to be higher if their spouse earns very little money, but also if their spouse earns much money, just not if their spouse is in between, then the model will not be able to pick up on that.    
+An efficient way to improve predictive performance is therefore to break down the information contained in the predictors to make them easier for the model to work with. In the regression case, for example, it is very common to use the square of variables as additional predictors or to add the interactions between variables. 
+1. Add variables that capture the squared income of the spouse as well as the interaction of the home value and outstanding mortgage. An simple interaction term is just the product of two variables.
+2. Replace the employement variable **EMPS_A** by a variable that captures the mean income in each employment group using function **ave()**. This is an excellent way to make information explicit to the algorithms when making predictions. Be careful to calculate averages on past data at each point and the training data only, when we discuss model evaluation!
+```{r}
+# New variables to include non-linearity
+loans$dINC_SP2 <- loans$dINC_SP ^ 2
+loans$house_mortgage <- loans$dHVAL * loans$dMBO
+
+# Average income by group
+loans$EMPS_A <- ave(loans$dINC_A, loans$EMPS_A, FUN = mean)
+
+# In practice, using packages {plr} or {data.table} is a lot faster!
+```
+
+
+#### Loading scripts and automating data cleaning
+You have learned how to clean data and how to create custom functions already. So let's put this knowledge to use and create a custom function that loads and cleans the data for us. We will first create a custom function in a special script, where you can save all your convenient custom functions. Then, in the script for this exercise and future exercises, we will load the function and use it to load and clean our dataset in one line of code.
+
+1. Open a new, empty R script (*File - New File - R Script*) and save it as **helperfunctions.R** in the same folder where the data is saved.
+2. Inside of this file, create a function called **GetLoanDataset** that takes no input and does the following steps:
+    - Load the loans data set **loan_data.csv**. Assume that the working directory is correctly set and that the data is in the current directory.
+    - Transform the relevant variables to factor variables and clean the missing values in variable **YOB**. HINT: Copy and paste the code from the previous exercises, but make sure that it works. The factor variables are **PHON**, **BAD**, and **YOB_missing**. Relabel variable **BAD** from 1 to *bad* and 0 to *good*.
+    - **return()** the cleaned and ready data frame.
+3. Make sure you saved file **helperfunctions.R**. Switch to the R script for this exercise. In this script, set the working directory to the location of the files **loan_data.csv** and **helperfunctions.R**.
+4. Use function **source()** to load and execute the script *helperfunctions.R* containing your custom function. The function should now be visible in your R environment. You can check by calling **GetLoanDataset** without the brackets to see the function code.
+5. Use your custom function **GetLoanDataset()** to load and clean the data and save the resulting data frame to an object **loans**.
+
+Well done, this will allow us to load the dataset in just a couple of lines from now on.
+
+```{r}
+# Source (=run) the R script storing your function(s)
+source("Rintro_HelperFunctions.R")
+loans <- GetLoanDataset()
+
+# If the previous line did not work on your machine, the most likely 
+# cause is that something with the file directories went wrong.
+# Check whether the data is available in your working directory. 
+# Recall that you can query your current working directory using the
+# commend getwd(). Also have a look into the function's source code
+# to understand where it tries to find the data file on your disk.
+# If everything went well, you can now use the data set, e.g., to 
+# build models. Let's produce the usual summary for start
+str(loans)
+```
+
+
+# Regression
+Regression is one of the standard models in predictive analytics, modeling the outcome of a variable by a linear combination of independent variables (the regression part). Most model functions specify the predictors by argument **x**, the target variable by argument **y**. Since we usually have one data frame that contains both our target variable and the predictive variables, many functions also accept a *formula* argument. A formula argument is entered with a *~* with the target on the left side and the predictor variables on the right, like this *y ~ x1 + x2 + x3*.    
+There are several convenient abbreviations that you can find with **?formula**. The most common are the dot **.** as a placeholder for "all other variables" and **-** to specify which variables to exclude, e.g. *y ~ . -x1 -1* for a model without *x1* and the intercept.
+
+1. Run a regression to predict the income of a person **dINC_A** based on all other variables except variable **BAD** in the data set. Search for the appropriate function to create the model and save the trained model as **lr**.
+2. Use the trained model **lr** to predict the income of each applicant in the **loans** data frame. Use function **predict()** and store the predictions in a variable **pred.lr** 
+3. Which variables have a significant impact on the predicted income of an applicant? Be careful when making any causal interpretations here, since its the income that casually determines the value of the house rather than the other way around!
+
+```{r}
+# Create your model
+lr <- lm(dINC_A ~.-BAD, data = loans)
+# Look into what happens to the data inside the function
+# I found this by looking into the lm function
+prepData <- model.matrix(dINC_A ~ .-BAD, data = loans)
+head(prepData)
+# The factors have been split up into a set of binary dummy variables!
+
+# Check the model results by printing the summary
+summary(lr)
+# Coefficients
+coef(summary(lr))
+
+## Model prediction
+# Remember that it is bad practice to train and test a model on the same data! Think about why.
+# We will discuss this later in class.
+pred.lr <- predict(lr, newdata = loans)
+summary(pred.lr)
+# Income statistics for comparison
+summary(loans$dINC_A)
+
+## Mean absolute error
+MAE <- mean(abs(loans$dINC_A - pred.lr))
+MAE
+```
