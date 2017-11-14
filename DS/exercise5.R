@@ -28,7 +28,20 @@ sum((y-pred.lr)^2) / length(y)
 # glmnet library for lasso-regularized logistic regression
 library('glmnet')
 
-# standardize data
+target_space <- loans$BAD
+input_space <- loans[, !(names(loans) %in% c('BAD'))]
+input_space <- data.matrix(input_space)
+
+rlm <-glmnet(x=input_space, y=target_space, family='binomial', standardize=TRUE)
+plot(rlm, xvar="lambda", label=TRUE)
+summary(rlm)
+print(rlm)
+
+#predict
+rlm_predict <- predict(rlm, newx=input_space ,type = "response")
+
+"
+standardize data
 numeric_idx <- sapply(loans, is.numeric)
 loans[numeric_idx] <- sapply(loans[numeric_idx], standardize)
 
@@ -36,3 +49,4 @@ target_space <- loans$dINC_A
 input_space <- loans[numeric_idx & !(names(loans[numeric_idx]) %in% c('dINC_A'))] 
 ?glmnet
 glmnet(x=input_space, y=target_space, family='gaussian')
+"
