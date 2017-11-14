@@ -12,7 +12,7 @@ public class Main {
     public static void main(String[] args) {
         long startTime = System.nanoTime();
         try{
-            File directory = new File("corpus/reference-corpus");
+            File directory = new File(args[0]);
 
             FilenameFilter xmlFilter = (dir, name) -> {
                 String lowercaseName = name.toLowerCase();

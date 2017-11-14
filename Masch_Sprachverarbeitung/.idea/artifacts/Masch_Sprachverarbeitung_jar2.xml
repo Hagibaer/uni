@@ -1,0 +1,8 @@
+<component name="ArtifactManager">
+  <artifact type="jar" name="Masch_Sprachverarbeitung:jar2">
+    <output-path>$PROJECT_DIR$/out/artifacts/Masch_Sprachverarbeitung_jar2</output-path>
+    <root id="archive" name="Masch_Sprachverarbeitung.jar">
+      <element id="module-output" name="Masch_Sprachverarbeitung" />
+    </root>
+  </artifact>
+</component>
