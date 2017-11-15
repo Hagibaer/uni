@@ -13,11 +13,11 @@ which(selector, arr.ind = TRUE)
 
 # Predict on loans (tasks requires it)
 pred.lr <- predict(lr, newdata = loans, type='response')
-summary(pred.lr)
 
 pred.lr.logit <- ifelse(pred.lr > 0.5, 1,0) #map logit to classes
 y <- as.integer(loans$BAD) -1
 classification_error <- mean(pred.lr.logit != y)
+summary(pred.lr)
 print(paste('Accuracy', 1-classification_error))
 
 
@@ -28,11 +28,12 @@ sum((y-pred.lr)^2) / length(y)
 # glmnet library for lasso-regularized logistic regression
 library('glmnet')
 
+#better way would be to use input_space <-  model.matrix(Bad-.-1, loans)
 target_space <- loans$BAD
 input_space <- loans[, !(names(loans) %in% c('BAD'))]
 input_space <- data.matrix(input_space)
 
-rlm <-glmnet(x=input_space, y=target_space, family='binomial', standardize=TRUE)
+rlm <-glmnet(x=input_space, y=target_space, family='binomial', standardize=TRUE, alpha=1)
 plot(rlm, xvar="lambda", label=TRUE)
 summary(rlm)
 print(rlm)
