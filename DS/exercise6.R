@@ -9,6 +9,7 @@ lr <- glm(formula = BAD ~ . -BAD, data=loans, family=binomial(link='logit'))
 # lasso-regularized
 library('glmnet')
 target_space <- loans$BAD
+class(target_space)
 input_space <- loans[, !(names(loans) %in% c('BAD'))]
 input_space <- data.matrix(input_space)
 
