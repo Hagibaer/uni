@@ -39,7 +39,7 @@ rlm_predict <- ifelse(rlm_predict > 0.5, 1, 0)
 # Create a dataframe with two columns: order_item_id = 100001 - 150000 and return = prediction
 order_item_id = seq(from=100001, to=150000, by = 1)
 return = rlm_predict
-return <- sapply(return, function(x) paste0("'", x)) # to outsmart excel
+# return <- sapply(return, function(x) paste0("'", x)) 
 
 
 
