@@ -6,12 +6,10 @@ X_train = read.csv(file="Submission_1/data/X_train.csv", header=TRUE, sep=",")
 X_test = read.csv(file="Submission_1/data/X_test.csv", header=TRUE, sep=",")
 y_train = read.csv(file="Submission_1/data/y_train.csv", header=FALSE, sep=",")
 
-
 # Best model from the set (Logistic_Regression, Decision_Tree, Random_Forest, Bayes) was LR (tested in Python skript)
 X_train <- data.matrix(X_train)
 X_test <- data.matrix(X_test)
 y_train <- as.factor(y_train$V1)
-
 
 # Train model
 library('glmnet')
