@@ -8,9 +8,10 @@ import java.util.*;
 public class HiddenMarkov implements Serializable {
     private Map<String, Map<String, Double>> emission_prob;
     private Map<String, Map<String, Double>> transition_prob;
-    private Map<String, Map<String, Double>> viterbi_prob;
-    private Map<String, Map<String, String>> viterbi_ways;
+    private Map<String, Map <Integer, Double>> viterbi_prob;
+    private Map<String, Map<Integer, String>> backpointer;
     private Map<String, Double> start_prob;
+
 
 
     public HiddenMarkov(){
@@ -142,63 +143,134 @@ public class HiddenMarkov implements Serializable {
                 - get precessors state and precessor ... until precessor = null
             - loop through the state list from back to front, assign tag[i] to word[i]
          */
-        this.viterbi_prob= new HashMap<String, Map<String, Double>>();
-        this.viterbi_ways = new HashMap<String, Map<String, String>>();
+        // Initialize viterbi table, backlog & first_row boolean
+        this.viterbi_prob = new HashMap<String, Map<Integer, Double>>();
+        this.backpointer = new HashMap<String, Map<Integer, String>>();
+        boolean first_row = true;
 
         String[] words_with_token = sentence.trim().split("\\s+");
         ArrayList<String> words = new ArrayList<String>();
         String word;
-        boolean first_row = true;
 
-
-        for (String word_with_token : words_with_token){
+        // Loop over the complete sentence and fill the tables column-wise
+        for(String word_with_token : words_with_token){
             word = word_with_token.substring(0,word_with_token.lastIndexOf('/'));
             words.add(word);
 
-            // Calculate first column - loop over trans-key Set because we can assume that it has all the tags in it
+            // Loop over emmission-keyset == Brown-Tag-Set
+            // Special for-loop for the first word, since it has no precessor.
             if(first_row){
-                for(String tag : this.emission_prob.keySet()){
-                    Double prob = 0.0;
-                    if(this.start_prob.get(tag) == null && this.emission_prob.get(tag).get(word) == null){
-                        prob = 0 + this.emission_prob.get(tag).get("unknown");
-                    }else if(this.start_prob.get(tag) == null){
-                        prob = 0 + this.emission_prob.get(tag).get(word);
-                    }else if(this.emission_prob.get(tag).get(word) == null){
-                        prob = this.start_prob.get(tag) + this.emission_prob.get(tag).get("unknown");
+                for(String tag: this.emission_prob.keySet()){
+                    Double start_probability = this.start_prob.get(tag);
+                    Double emission_probability = this.emission_prob.get(tag).get(word);
+
+                    Double probability;
+                    if(start_probability == null || emission_probability == null){
+                        probability = 0 + this.emission_prob.get(tag).get("unknown");
                     }else{
-                        prob = this.start_prob.get(tag) + this.emission_prob.get(tag).get(word);
+                        probability = start_probability + emission_probability;
                     }
 
-                    Map<String, Double> prob_map = new HashMap<String, Double>();
-                    prob_map.put(tag, prob);
-                    // Save probabilities
-                    this.viterbi_prob.put(word, prob_map);
+                    // Store probability for state s at position 1
+                    Map<Integer, Double> inner_map = new HashMap<Integer, Double>();
+                    inner_map.put(1, probability);
+                    viterbi_prob.put(tag, inner_map);
 
-                    // Save precessor
-                    Map<String, String> precessor = new HashMap<String, String>();
-                    precessor.put(word, "end");
-                    this.viterbi_ways.put(tag, precessor);
+                    // Store precessor in backlog for s at position 1
+                    Map<Integer, String> inner_map_backlog = new HashMap<Integer, String>();
+                    inner_map_backlog.put(1, "end");
+                    this.backpointer.put(tag, inner_map_backlog);
                 }
                 first_row = false;
             }else{
-                // Calculate other columns
-                for(String tag1 : this.emission_prob.keySet()){
-                    ArrayList<Double> routesToCurrentState = new ArrayList<Double>();
-                    Map<String, Double> innerMap = viterbi_prob.get(words.get(words.size()-2));
-                    for(String tag2 : innerMap.keySet()){
-                        if(this.transition_prob.get(tag2).get(tag1) != null){
-                            routesToCurrentState.add(innerMap.get(tag2) + this.transition_prob.get(tag2).get(tag1));
+                // Compute all the other columns that are not the first one
+
+                int position = words.size(); // get current position
+
+                // again loop over keyset == brown-set
+                for(String tag: this.emission_prob.keySet()){
+                    Double emission_probability = this.emission_prob.get(tag).get(word);
+                    // Get max value and maxarg for the calculation
+                    // I have to loop over the previous column.
+                    // For every key_prev in the previous column, calculate: prob + trans_prob(key_prev, key_now)
+                    // get the max value, and the argmax.
+                    String max_state = "";
+                    Double max_value = -9999999.9;
+
+                    for(String key_prev : this.viterbi_prob.keySet()){
+                        Double prev_prob = this.viterbi_prob.get(key_prev).get(position-1);
+                        Double trans = this.transition_prob.get(key_prev).get(tag);
+                        Double interim_prob;
+
+                        if(prev_prob == null){
+                            interim_prob = -9999999.0;
+                        }else if(trans == null){
+                            interim_prob = -9999999.0;
+                        }else{
+                            interim_prob = prev_prob + trans;
+                        }
+                        String state = key_prev;
+                        if(interim_prob > max_value){
+                            max_value = interim_prob;
+                            max_state = state;
                         }
                     }
-                    System.out.println(routesToCurrentState);
-                    Double max_value = Collections.max(routesToCurrentState);
-                    if(this.emission_prob.get(tag1).get(word) == null){
-                        Double prob = this.emission_prob.get(tag1).get("unknown") + max_value;
+
+                    // Now calculate the value for this tag at our current position
+                    Double probability;
+                    if(emission_probability == null){
+                        probability = this.emission_prob.get(tag).get("unknown") + max_value;
+                    }else{
+                        probability = emission_probability + max_value;
                     }
-                    Double prob = this.emission_prob.get(tag1).get(word) + max_value;
+
+                    // And put it into the map for state s at position t
+                    Map<Integer, Double> inner_map = new HashMap<Integer, Double>();
+                    inner_map.put(position, probability);
+                    viterbi_prob.put(tag, inner_map);
+
+                    // Now save the precessor as well
+                    Map<Integer, String> inner_map_backlog = new HashMap<Integer, String>();
+                    inner_map_backlog.put(position, max_state);
+                    this.backpointer.put(tag, inner_map_backlog);
                 }
             }
+        } // Tables are calculated
+
+        // Get the last word and check which state has the highest probability
+        String last_word = words.get(words.size()-1);
+        Double maxValue = -999999.999;
+        String state = "";
+        for(String tag : this.viterbi_prob.keySet()){
+            Double interim_value = this.viterbi_prob.get(tag).get(last_word);
+            if(interim_value == null){
+                interim_value = -999999.0;
+            }
+            String interim_tag = tag;
+            if(interim_value > maxValue){
+                maxValue = interim_value;
+                state = interim_tag;
+            }
         }
+        // Now we got the last state and the position. Now we go through the backlog with that until we reach the end
+        int position = words.size();
+        ArrayList<String> result = new ArrayList<String>();
+        String a = this.backpointer.get(state).get(position);
+
+
+        while(this.backpointer.get(state).get(position).equals("end")){
+            // add the state to the list
+            result.add(state);
+
+            // update state and position
+            state = this.backpointer.get(state).get(position);
+            position = position - 1;
+        }
+
+        System.out.println(result);
+
+
+
         sentence = "ABCD ".trim() + "\n";
         return sentence;
     }

@@ -1,0 +1,67 @@
+this.viterbi_prob= new HashMap<String, Map<String, Double>>();
+        this.viterbi_ways = new HashMap<String, Map<String, String>>();
+
+        String[] words_with_token = sentence.trim().split("\\s+");
+        ArrayList<String> words = new ArrayList<String>();
+        String word;
+        boolean first_row = true;
+
+
+        for (String word_with_token : words_with_token){
+            word = word_with_token.substring(0,word_with_token.lastIndexOf('/'));
+            words.add(word);
+
+            // Calculate first column - loop over trans-key Set because we can assume that it has all the tags in it
+            if(first_row){
+                for(String tag : this.emission_prob.keySet()){
+                    Double prob = 0.0;
+                    if(this.start_prob.get(tag) == null && this.emission_prob.get(tag).get(word) == null){
+                        prob = 0 + this.emission_prob.get(tag).get("unknown");
+                    }else if(this.start_prob.get(tag) == null){
+                        prob = 0 + this.emission_prob.get(tag).get(word);
+                    }else if(this.emission_prob.get(tag).get(word) == null){
+                        prob = this.start_prob.get(tag) + this.emission_prob.get(tag).get("unknown");
+                    }else{
+                        prob = this.start_prob.get(tag) + this.emission_prob.get(tag).get(word);
+                    }
+
+                    Map<String, Double> prob_map = new HashMap<String, Double>();
+                    prob_map.put(tag, prob);
+                    // Save probabilities
+                    this.viterbi_prob.put(word, prob_map);
+
+                    // Save precessor
+                    Map<String, String> precessor = new HashMap<String, String>();
+                    precessor.put(word, "end");
+                    this.viterbi_ways.put(tag, precessor);
+                }
+                first_row = false;
+            }else{
+                // Calculate other columns
+                for(String tag1 : this.emission_prob.keySet()){
+                    ArrayList<Double> routesToCurrentState = new ArrayList<Double>();
+                    Map<String, Double> innerMap = viterbi_prob.get(words.get(words.size()-2));
+                    for(String tag2 : innerMap.keySet()){
+                        if(this.transition_prob.get(tag2).get(tag1) != null){
+                            routesToCurrentState.add(innerMap.get(tag2) + this.transition_prob.get(tag2).get(tag1));
+                        }
+                    }
+                    System.out.println(routesToCurrentState);
+                    Double max_value = Collections.max(routesToCurrentState);
+                    if(this.emission_prob.get(tag1).get(word) == null){
+                        Double prob = this.emission_prob.get(tag1).get("unknown") + max_value;
+                    }
+                    Double prob = this.emission_prob.get(tag1).get(word) + max_value;
+                }
+            }
+        }
+        sentence = "ABCD ".trim() + "\n";
+        return sentence;
+    }
+    private Double maxValue(Double first, Double... rest){
+        Double ret = first;
+        for(Double value: rest){
+            ret = Math.max(ret, value);
+        }
+        return ret;
+    }

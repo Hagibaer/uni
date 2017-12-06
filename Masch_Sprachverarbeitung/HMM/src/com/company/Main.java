@@ -43,7 +43,6 @@ public class Main {
         File output_dir = new File("./corpus/output");
         File[] test_files = input_dir.listFiles();
         for(File file: test_files){
-            System.out.println(file.getName());
             if(file.isFile()){
                 try{
                     BufferedReader reader = new BufferedReader(new FileReader(file));
