@@ -11,6 +11,7 @@ public class HiddenMarkov implements Serializable {
     private Map<String, Map <Integer, Double>> viterbi_prob;
     private Map<String, Map<Integer, String>> backpointer;
     private Map<String, Double> start_prob;
+    private final Double MIN_VALUE = -99999.99;
 
 
 
@@ -30,7 +31,7 @@ public class HiddenMarkov implements Serializable {
         // Go through the sentence and split the tokens
         for(String word_with_token: words_with_token){
             // Split word and token
-            tag = word_with_token.substring(word_with_token.lastIndexOf('/')+1).trim();
+            tag = word_with_token.substring(word_with_token.lastIndexOf('/')+1);
             word = word_with_token.substring(0,word_with_token.lastIndexOf('/'));
 
             // increase counts in emmision_probabilities for every word appearing
@@ -44,7 +45,7 @@ public class HiddenMarkov implements Serializable {
                 if(word_emmision_prob_map.get(word) == null){
                     word_emmision_prob_map.put(word, 1.0);
                 }else{
-                    word_emmision_prob_map.put(word, word_emmision_prob_map.get(word) + 1);
+                    word_emmision_prob_map.put(word, word_emmision_prob_map.get(word) + 1.0);
                 }
             }
             words.add(word);
@@ -56,7 +57,7 @@ public class HiddenMarkov implements Serializable {
         if(prob_first_tag == null){
             this.start_prob.put(tags.get(0), 1.0);
         }else
-            this.start_prob.put(tags.get(0), prob_first_tag + 1 );
+            this.start_prob.put(tags.get(0), prob_first_tag + 1.0 );
 
         // Create all the transition probabilities
         for(int i = 0; i < tags.size()-1; i++){
@@ -136,11 +137,11 @@ public class HiddenMarkov implements Serializable {
             - calculate the probabilities of all states for this word via viterbi v(s+1) = Emission(v(s+1) + max(v(s) + trans(v(s), ...)
               - if emission == 0 --> emission = assign unknown probability
             (because we already have made all the probabilites logs the formula is correct)
-            - Remember precessor (Which tag - transition was the highest?)
+            - Remember predecessor  (Which tag - transition was the highest?)
             - Repeat for every word until the end of the sentence
             - If the sentence is done:
-            - Get max probability in the last column --> Get this state and precessor (save state to list)
-                - get precessors state and precessor ... until precessor = null
+            - Get max probability in the last column --> Get this state and predecessor  (save state to list)
+                - get predecessor s state and predecessor  ... until predecessor  = null
             - loop through the state list from back to front, assign tag[i] to word[i]
          */
         // Initialize viterbi table, backlog & first_row boolean
@@ -158,7 +159,7 @@ public class HiddenMarkov implements Serializable {
             words.add(word);
 
             // Loop over emmission-keyset == Brown-Tag-Set
-            // Special for-loop for the first word, since it has no precessor.
+            // Special for-loop for the first word, since it has no predecessor .
             if(first_row){
                 for(String tag: this.emission_prob.keySet()){
                     Double start_probability = this.start_prob.get(tag);
@@ -166,7 +167,7 @@ public class HiddenMarkov implements Serializable {
 
                     Double probability;
                     if(start_probability == null || emission_probability == null){
-                        probability = 0 + this.emission_prob.get(tag).get("unknown");
+                        probability = -99999.99 + this.emission_prob.get(tag).get("unknown");
                     }else{
                         probability = start_probability + emission_probability;
                     }
@@ -176,7 +177,7 @@ public class HiddenMarkov implements Serializable {
                     inner_map.put(1, probability);
                     viterbi_prob.put(tag, inner_map);
 
-                    // Store precessor in backlog for s at position 1
+                    // Store predecessor  in backlog for s at position 1
                     Map<Integer, String> inner_map_backlog = new HashMap<Integer, String>();
                     inner_map_backlog.put(1, "end");
                     this.backpointer.put(tag, inner_map_backlog);
@@ -187,8 +188,9 @@ public class HiddenMarkov implements Serializable {
 
                 int position = words.size(); // get current position
 
+
                 // again loop over keyset == brown-set
-                for(String tag: this.emission_prob.keySet()){
+                for(String tag: this.emission_prob.keySet()) {
                     Double emission_probability = this.emission_prob.get(tag).get(word);
                     // Get max value and maxarg for the calculation
                     // I have to loop over the previous column.
@@ -197,20 +199,20 @@ public class HiddenMarkov implements Serializable {
                     String max_state = "";
                     Double max_value = -9999999.9;
 
-                    for(String key_prev : this.viterbi_prob.keySet()){
-                        Double prev_prob = this.viterbi_prob.get(key_prev).get(position-1);
+                    for (String key_prev : this.viterbi_prob.keySet()) {
+                        Double prev_prob = this.viterbi_prob.get(key_prev).get(position - 1);
                         Double trans = this.transition_prob.get(key_prev).get(tag);
                         Double interim_prob;
 
-                        if(prev_prob == null){
+                        if (prev_prob == null) {
                             interim_prob = -9999999.0;
-                        }else if(trans == null){
+                        } else if (trans == null) {
                             interim_prob = -9999999.0;
-                        }else{
+                        } else {
                             interim_prob = prev_prob + trans;
                         }
-                        String state = key_prev;
-                        if(interim_prob > max_value){
+                        String state = key_prev; // I know its redundant just helps me having a better oversight of what I am doing
+                        if (interim_prob > max_value && !state.equals("nil")) {
                             max_value = interim_prob;
                             max_state = state;
                         }
@@ -218,9 +220,9 @@ public class HiddenMarkov implements Serializable {
 
                     // Now calculate the value for this tag at our current position
                     Double probability;
-                    if(emission_probability == null){
+                    if (emission_probability == null) {
                         probability = this.emission_prob.get(tag).get("unknown") + max_value;
-                    }else{
+                    } else {
                         probability = emission_probability + max_value;
                     }
 
@@ -229,7 +231,7 @@ public class HiddenMarkov implements Serializable {
                     inner_map.put(position, probability);
                     viterbi_prob.put(tag, inner_map);
 
-                    // Now save the precessor as well
+                    // Now save the predecessor  as well
                     Map<Integer, String> inner_map_backlog = new HashMap<Integer, String>();
                     inner_map_backlog.put(position, max_state);
                     this.backpointer.put(tag, inner_map_backlog);
@@ -238,36 +240,36 @@ public class HiddenMarkov implements Serializable {
         } // Tables are calculated
 
         // Get the last word and check which state has the highest probability
-        String last_word = words.get(words.size()-1);
+        int last_word_position = words.size();
         Double maxValue = -999999.999;
         String state = "";
         for(String tag : this.viterbi_prob.keySet()){
-            Double interim_value = this.viterbi_prob.get(tag).get(last_word);
+            Double interim_value = this.viterbi_prob.get(tag).get(last_word_position);
             if(interim_value == null){
                 interim_value = -999999.0;
             }
-            String interim_tag = tag;
-            if(interim_value > maxValue){
+            if(interim_value > maxValue && !tag.equals("nil")){
                 maxValue = interim_value;
-                state = interim_tag;
+                state = tag;
             }
         }
+
         // Now we got the last state and the position. Now we go through the backlog with that until we reach the end
-        int position = words.size();
         ArrayList<String> result = new ArrayList<String>();
-        String a = this.backpointer.get(state).get(position);
-
-
-        while(this.backpointer.get(state).get(position).equals("end")){
+        String a = this.backpointer.get(state).get(last_word_position);
+        while(!this.backpointer.get(state).get(last_word_position).equals("end")){
             // add the state to the list
             result.add(state);
 
             // update state and position
-            state = this.backpointer.get(state).get(position);
-            position = position - 1;
+            state = this.backpointer.get(state).get(last_word_position);
+            last_word_position-=1;
+
+            System.out.println(state);
         }
 
         System.out.println(result);
+
 
 
 
