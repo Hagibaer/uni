@@ -1,0 +1,12 @@
+Ergebnisse:
+
+Confusion - LR
+[[1716   47]
+ [   9 1502]]
+
+Mean-Accuracy LR: 0.9828932647124636
+Standard Deviation LR: 0.006151393584998162
+Variance LR: 3.783964303755653e-05
+
+
+Gesamte Validierung unter: Validierung.ipynb
