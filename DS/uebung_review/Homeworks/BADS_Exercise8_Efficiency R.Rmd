@@ -1,0 +1,154 @@
+---
+title: "Exercise 7"
+subtitle: Business Analytics and Data Science WS16/17
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+# NEED FOR CHANGE ---- 
+# Note that this code will not work on your computer. 
+wdir <- "~/Seafile/lecture/BADS/Exercise BADS"
+setwd(wdir)
+
+# You can uncomment the next line and specify the directory for the exercise on your computer
+# wdir <- "C://Your/own/path"
+# End of NEED FOR CHANGE ----
+
+knitr::opts_knit$set(root.dir = wdir)
+# results = c("all", "hide")
+knitr::opts_chunk$set(echo = FALSE, results = 'all', message = FALSE, warning = FALSE, fig.keep = 'all', cache = FALSE)
+options(repos=c(CRAN = "https://cran.uni-muenster.de/"))
+```
+
+## Introduction
+You are now familiar with your first really complex machine learning model from the lecture: the artificial neural network. With some extensions and at a much larger size, this is the model that facilitates self-driving cars, digital assistancs such as Siri, Cortana, etc., and humiliated famours Go players. In this tutorial, we use it to predict credit risk using  our loan data set. To find the best neural network, or at least the neural network with the optimal number of nodes, we will use the cross-validation loop from the previous tutorial to validate each of the parameter candidates.
+Later on, you will learn how to simplify the process and tune paramter with the **caret** package. We will also learn how to set up a parallel backend and parallelize code with **caret** and R in general for more speed.
+
+## Data preparation and featurization
+
+1. Load the data set loans and split into training and test set with a ratio of 80:20 as done in the previous exercise. 
+2. Use function **cut()** as in the last exercise to save a vector of indices that separate the training data into 5 folds of equal size.
+3. Initialize a vector **nnet.sizes** containing the *n* sizes for the neural network that you would like to compare, e.g. 3, 6, 9, 12, and 15 nodes. Also initialize an empty *k*x*n* matrix to collect the results within the loop.
+4. It's time to put everything together. Write two for loops, one within the other, that do the following:    
+    - For each size candidate:
+        - For each fold:
+            - Train a model with size equal to the current size candidate on the other folds.
+            - Predict the outcomes for the current fold.
+            - Calculate the AUC value on the validation fold and save the result. Function **auc()** from package **pROC** does this quickly.
+5. Display the results for each tuning candidate in *n* boxplots.
+
+```{r}
+# Load the data set 
+library("data.table")
+library("nnet") # library(h2o) would be an alternative high-performance package
+# Link to the R script storing your function(s)
+raw <- fread("/Users/hauptjoh/Seafile/lecture/BADS/Assignment1718/BADS_WS1718_known.csv")
+# Specify the 'keys' i.e. ID variables for additional speed gains when merging or sorting
+setkey(raw, user_id, item_id, order_item_id)
+
+# Splitting the data into a test and a training set 
+idx.train <- caret::createDataPartition(y = raw$return, p = 0.8, list = FALSE) # Draw a random, stratified sample including p percent of the data
+
+# Use data.table to calculate grouped summary statistics efficiently
+customers <- raw[ ,  mean(return), by = "user_id"]
+# Every piece of information could be relevant, here for example the number of times a customer came back
+customers <- raw[ , list("avg_return" = mean(return), "nr_obs" = .N), by = "user_id"]
+# Careful: When using the target variable as a feature, only calculate it on the training data
+# You can merge data tables X and Y using the syntax X[Y]
+raw <- raw[ raw[idx.train, list("avg_return" = mean(return), "nr_obs" = .N), by = "user_id"]]
+
+# Tackle cleaning and featurization problems with data science and statistics
+length(unique(raw$item_size))
+unique(raw$item_size)
+
+sizes <- raw[, list("count" = .N), by = c("user_id", "item_size") ]
+sizes_table <- dcast(sizes, user_id ~ item_size, value.var = "count", fill = 0)
+sizes_sim <- cor(sizes_table[,2:length(sizes_table)])
+#sizes_sim <- dist(sizes_table[,2:length(sizes_table)], method = "cosine")
+sizes_sim[c("S", "M", "L"),]
+sizes_cluster <- hclust(as.dist(1-abs(sizes_sim)), method = "ward.D2")
+plot(sizes_cluster)
+rect.hclust(sizes_cluster, k=9, border="red")
+# Use the size cluster instead of or in addition to the original sizes
+sizes_grouping <- cutree(sizes_cluster, k=5) # cut tree into 5 clusters
+
+```
+
+## Tutorial: Parallel computing in R
+When talking about parallel computing, it is useful to think of the computer as a factory that produces our code output. Just like a factory, our system houses many processes at the same time. Usually when we run an R script, a single worker is working its way through the script and producing output at it goes along. And just like in a factory, several workers to work at separate parts of the project at the same time. Naturally, this requires some organization and the consolidation of the output of all workers overhead.
+In the case of paramter tuning, we face a large project that is "embarrassingly parallel", where the output of each worker is completely independent of the other workers' results. It is therefore especially convenient to split this work up between several workers and that's what we will do.
+
+1. You can easily set up a parallel backend with the **doParallel** package. This takes two steps:      
+    - Define a cluster object **cl** with the output of function **makeCluster()**. You will only need to specify the number of workes/cores that you want to use. HINT: Find out the number of available clusters with the **detectCores()** function. Many modern laptops have more than a single core, but older models might only have one. In that case, you can't parallelize your code in this way. You could sign up with the *Research Data Center (RDC)* of the faculty to remotely use their servers.
+    - Register the cluster with function **registerDoParallel()**. You can check the number of workers currently registered with **getDoParWorkers()**.
+    - After you are done using your workers, don't forget to tell them to go home for the day with function **stopCluster()**.
+2. Install and load package **foreach** that gives lapply-like functionality for sequential and parallel loops. It'll need some restructuring, can you manage to parallelize the nested model selection loops with function **foreach()** and operators **%:%** and **%dopar%**. Check out the **vignette()** for *foreach* and *%:%*.
+
+```{r}
+source("BADS-HelperFunctions.R")
+loans <- get.loan.dataset()
+
+# Splitting the data into a test and a training set 
+set.seed(321)
+idx.train <- createDataPartition(y = loans$BAD, p = 0.8, list = FALSE) # Draw a random, stratified sample including p percent of the data
+tr_raw <- loans[idx.train, ] # training set
+ts_raw <-  loans[-idx.train, ] # test set (drop all observations with train indeces)
+
+# Actual data splitting
+train <- loans[idx.train, ] # training set
+test <-  loans[-idx.train, ] # test set (drop all observations with train indeces)
+# The number of folds and the specific folds for cv
+k <- 5
+head(train[sample(nrow(train)),])
+train.rnd <- train[sample(nrow(train)),]
+folds <- cut(1:nrow(train.rnd), breaks = k, labels = FALSE)
+
+### Specify the setup:
+# The number of nodes to try for the model
+nnet.sizes <- seq(from = 3, to = 15, by = 3)
+# Initialize the data frame that collects the results
+
+# Load necessary packages
+if(!require("doParallel")) install.packages("doParallel"); library("doParallel") # load the package
+if(!require("microbenchmark")) install.packages("microbenchmark"); library("microbenchmark") # load the package
+
+# Setup up parallel backend
+  # Detect number of available clusters, which gives you the maximum number of "workers" your computer has
+  nrOfCores <- detectCores()
+  cl <- makeCluster( max(1,detectCores()-1))
+  registerDoParallel(cl)
+  message(paste("\n Registered number of cores:\n",getDoParWorkers(),"\n"))
+  # Don't forget to stop the cluster when you don't need it anymore!
+  
+### Parallelization with foreach
+# This is the parallel version of the nested loop model selection.
+# Note that each of the workers is a fresh R instance without any variables or loaded packages
+# Foreach exports variables that occur in the code automatically, but we need to specify
+# the packages that need to be loaded on each worker
+timing.par <- system.time(
+# Loop over different number of nodes, i.e. size of the neural network
+results.par <- foreach(n = 1:length(nnet.sizes), .combine = cbind, .packages = c("caret", "nnet", "pROC")) %:%
+  # This is the cross-validation loop from before
+  foreach(i = 1:k, .combine = c, .packages = c("caret","nnet", "pROC")) %dopar%{
+    # Split data into training and validation
+    idx.val <- which(folds == i, arr.ind = TRUE)
+    cv.train <- train.rnd[-idx.val,]
+    cv.val <- train.rnd[idx.val,]
+    # Train the neural network model with a number of nodes n
+    neuralnet <- nnet(BAD~., data = cv.train, trace = FALSE, maxit = 1000, size = nnet.sizes[n])
+    # Build and evaluate models using these partitions
+    yhat <- predict(neuralnet, newdata = cv.val, type = "raw")
+    # We use our above function to calculate the classification error
+    auc(cv.val$BAD, as.vector(yhat))
+  }
+)
+
+# Don't forget to close the cluster after you are done
+stopCluster(cl)
+
+# Compare the required time for the sequential and the parallel loop
+print(timing.seq)
+print(timing.par)
+```
