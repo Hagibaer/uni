@@ -1,115 +1,152 @@
+#! /usr/bin/python3
 import sys
 import string
 import ssl
+from typing import List
+
+import pickle
 
 import nltk
 from nltk.corpus import stopwords
 from nltk.tokenize import word_tokenize
 
 
-class NERTagger:
-    def __init__(self, entities, stopwords_list):
-        nltk.download('stopwords')
-        self.entities = concatenate_dict(entities)
-        self.punctuation = set(string.punctuation)
-        self.stopwords_list = set(stopwords_list).union(set(stopwords.words('english')))
-        self.tag_no_entity = "O"
+class Token:
+    def __init__(self, value, tag) -> object:
+        self.value = value
+        self.tag = tag
 
-    def tag_words(self, words):
+
+class NERTagger:
+    __tag_no_entity = "O"
+
+    def __init__(self, *args):
+        if len(args) == 3:
+            self.dictionary = args[0]
+            self.stopwords_list = args[1]
+            self.punctuation = args[2]
+        else:
+            self.__load_dictionaries()
+
+    def save_dictionaries(self):
+        pickle.dump(self.dictionary, open("dictionary.p", "wb"))
+        pickle.dump(self.stopwords_list, open("stopwords_list.p", "wb"))
+        pickle.dump(self.punctuation, open("punctuation.p", "wb"))
+
+    def __load_dictionaries(self):
+        self.dictionary = pickle.load(open("dictionary.p", "rb"))
+        self.stopwords_list = pickle.load(open("stopwords_list.p", "rb"))
+        self.punctuation = pickle.load(open("punctuation.p", "rb"))
+
+    def tag_tokens(self, words: List[Token]):
         tagged_words = []
         for word in words:
-            if word[0] in self.stopwords_list or word[0] in self.punctuation:
-                tagged_words.append((word[0], self.tag_no_entity))
-            elif word[0] in self.entities:
-                tagged_words.append((word[0], word[1]))
+            if word.value in self.stopwords_list or word.value in self.punctuation:
+                tagged_words.append(Token(word.value, self.__tag_no_entity))
+            elif word.value in self.dictionary:
+                tagged_words.append(Token(word.value, self.dictionary[word.value]))
             else:
-                tagged_words.append((word[0], self.tag_no_entity))
+                tagged_words.append(Token(word.value, self.__tag_no_entity))
         return tagged_words
 
 
 def main():
     if len(sys.argv) < 2:
         input_file = "./../data/uebung4-training.iob"
-        output_file = "./../output/uebung4-training.iob"
-        tagging(input_file, output_file)
-        print('---- NER-Tagger finished, see result in output file ----')
-
-        # print('Please specifiy the input and output file you want to use')
-    elif len(sys.argv) == 2:
-        input_file = sys.argv[2]
-        output_file = sys.argv[3]
+        train_tagger(input_file)
+        print('---- Training for NER-Tagger is finished ----')
+    elif len(sys.argv) == 3:
+        input_file = sys.argv[1]
+        output_file = sys.argv[2]
+        tag_tokens(input_file, output_file)
         print('---- NER-Tagger finished, see result in output file ----')
     else:
         print(sys.argv[1].lower())
         print('Oops, something went wrong, please check if you called the script correctly :)')
 
 
-def tagging(input_file, output_file):
-    tagger, words = prepare_data(input_file)
-    tagged_list = tagger.tag_words(words)
-
-    my_file = open(output_file, 'w')
-
-    for item in tagged_list:
-        my_file.write("{} \t {}\n".format(item[0], item[1]))
-    my_file.close()
-
-
-def prepare_data(input_file):
-    words, genes = build_dict_from_file(input_file)
+def train_tagger(input_file):
+    gold_std = build_dict_from_input_file(input_file)
+    additional_dictionary = build_additional_dict()
+    dictionary = concatenate_dicts(gold_std, additional_dictionary)
     stopwords_list = build_stopwords()
-    print("Words: "+str(len(words)))
-    print("Genes: "+str(len(genes)))
-    print("Stopwords: "+str(len(stopwords_list)))
-    tagger = NERTagger(genes, stopwords_list)
-    return tagger, words
+    punctuation = set(string.punctuation)
+    tagger = NERTagger(dictionary, stopwords_list, punctuation)
+    tagger.save_dictionaries()
 
 
-def concatenate_dict(known_entities):
+def tag_tokens(input_file, output_file):
+    tokens = read_tokens_from_input_file(input_file)
+    tagger = NERTagger()
+    tagged_list = tagger.tag_tokens(tokens)
+    write_annotations_to_file(tagged_list, output_file)
+
+
+def build_dict_from_input_file(path):
+    entities_from_file = {}
+    with open(path, "r", encoding='latin-1') as f:
+        for token in get_tokens_from_input_file(f.readlines()):
+            if token.tag != "O":
+                entities_from_file[token.value] = token.tag
+    return entities_from_file
+
+
+def build_additional_dict():
     entities_from_file = {}
     path = "./../data/dictionary/human-genenames.txt"
     with open(path, "r", encoding='latin-1') as f:
-        for token in get_tokens_for_dict_from_list(f.readlines()):
+        for token in get_tokens_from_list(f.readlines()):
             entities_from_file[token] = "B-protein"
-    return dict(list(known_entities.items()) + list(entities_from_file.items()))
+    return entities_from_file
+
+
+def concatenate_dicts(gold_std, additional_dict):
+    return dict(list(gold_std.items()) + list(additional_dict.items()))
 
 
 def build_stopwords():
-    # Empty dict
+    nltk.download('stopwords')
     stopwords_list = []
     path = "./../data/dictionary/english_stop_words.txt"
     with open(path, "r", encoding='latin-1') as f:
-        for token in get_tokens_for_dict_from_list(f.readlines()):
+        for token in get_tokens_from_list(f.readlines()):
             stopwords_list.append(token)
-    return stopwords_list
+    return set(stopwords_list).union(set(stopwords.words('english')))
 
 
-def build_dict_from_file(path):
-    words = []
-    # Empty dict
-    genes = {}
+def read_tokens_from_input_file(path):
+    tokens = []
     with open(path, "r", encoding='latin-1') as f:
-        for token in get_tokens_for_dict(f.readlines()):
-            words.append((token[0], token[1]))
-            if token[1] != "O":
-                genes[token[0]] = token[1]
-    return words, genes
+        for token in get_tokens_from_input_file(f.readlines()):
+            tokens.append(token)
+    return tokens
 
 
-def get_tokens_for_dict_from_list(lines):
+def write_annotations_to_file(annotations: List[Token], output_file):
+    my_file = open(output_file, 'w')
+    for token in annotations:
+        my_file.write("{} \t {}\n".format(token.value, token.tag))
+    my_file.close()
+
+
+def get_tokens_from_list(lines):
+    tokens = []
     for line in lines:
         if len(line) > 0:
-            tokens = word_tokenize(line)
-            if len(tokens) == 1:
-                yield tokens[0]
+            found_tokens = word_tokenize(line)
+            if len(found_tokens) == 1:
+                tokens.append(found_tokens[0])
+    return tokens
 
 
-def get_tokens_for_dict(lines):
+def get_tokens_from_input_file(lines):
+    tokens = []
     for line in lines:
         if len(line) > 0:
-            tokens = nltk.word_tokenize(line)
-            if len(tokens) == 2:
-                yield (tokens[0], tokens[1])
+            found_tokens = word_tokenize(line)
+            if len(found_tokens) == 2:
+                tokens.append(Token(found_tokens[0], found_tokens[1]))
+    return tokens
 
 
 if __name__ == '__main__':
