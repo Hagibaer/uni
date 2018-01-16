@@ -2,11 +2,13 @@
 import sys
 import string
 import ssl
+import math
 from typing import List
 
 import pickle
 
 import nltk
+from nltk.metrics import edit_distance
 from nltk.corpus import stopwords
 from nltk.tokenize import word_tokenize
 
@@ -43,11 +45,47 @@ class NERTagger:
         for word in words:
             if word.value in self.stopwords_list or word.value in self.punctuation:
                 tagged_words.append(Token(word.value, self.__tag_no_entity))
-            elif word.value in self.dictionary:
-                tagged_words.append(Token(word.value, self.dictionary[word.value]))
             else:
-                tagged_words.append(Token(word.value, self.__tag_no_entity))
+                self.__check_rules(word.value, tagged_words)
         return tagged_words
+
+    def __check_rules(self, word, tagged_words):
+        keys = list(self.dictionary.keys())
+
+        if word in self.dictionary:
+            tagged_words.append(Token(word.value, self.dictionary[word.value]))
+            return
+        elif self.__checkDistance(word, tagged_words, keys):
+            return
+        elif self.__checkWordStems(word, tagged_words, keys):
+            return
+
+        # elif for further rules
+
+        else:
+            tagged_words.append(Token(word.value, self.__tag_no_entity))
+
+        return
+
+    def __checkDistance(self, word, tagged_words, keys):
+        # calculate edit-distances
+        distances = list(map(lambda x: edit_distance(word, x), keys))
+
+        # get index where distance is minimal - conflict resolution happens here as we just pick first index_min
+        index_min = min(range(len(distances)), key=distances.__getitem__)
+
+        if distances[index_min] < round(math.floor(len(word)) * 0.9):
+            tagged_words.append(Token(word, self.dictionary[keys[index_min]]))
+            return True
+
+        return False
+
+    def __checkWordStems(self, word, tagged_words, keys):
+        # stem word
+        # stemm keys
+        # get index where stem-word = stem-key
+        # append tagged_words with word, self.dictionary[keys[index where stem-word = stem-key]]
+        return False
 
 
 def main():
