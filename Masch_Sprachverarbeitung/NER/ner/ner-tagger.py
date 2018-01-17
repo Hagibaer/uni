@@ -8,6 +8,7 @@ from typing import List
 import pickle
 
 import nltk
+from nltk.stem.snowball import *
 from nltk.metrics import edit_distance
 from nltk.corpus import stopwords
 from nltk.tokenize import word_tokenize
@@ -46,28 +47,27 @@ class NERTagger:
             if word.value in self.stopwords_list or word.value in self.punctuation:
                 tagged_words.append(Token(word.value, self.__tag_no_entity))
             else:
-                self.__check_rules(word.value, tagged_words)
+               rules_checked =  self.__check_rules(word.value, tagged_words)
         return tagged_words
 
     def __check_rules(self, word, tagged_words):
         keys = list(self.dictionary.keys())
 
         if word in self.dictionary:
-            tagged_words.append(Token(word.value, self.dictionary[word.value]))
-            return
-        elif self.__checkDistance(word, tagged_words, keys):
-            return
-        elif self.__checkWordStems(word, tagged_words, keys):
-            return
+            tagged_words.append(Token(word, self.dictionary[word]))
+            return True
+        elif self.__check_distance(word, tagged_words, keys):
+            return True
+        # elif self.__check_word_stems(word, tagged_words, keys):
+        #     return True
 
         # elif for further rules
 
         else:
-            tagged_words.append(Token(word.value, self.__tag_no_entity))
+            tagged_words.append(Token(word, self.__tag_no_entity))
+            return True
 
-        return
-
-    def __checkDistance(self, word, tagged_words, keys):
+    def __check_distance(self, word, tagged_words, keys):
         # calculate edit-distances
         distances = list(map(lambda x: edit_distance(word, x), keys))
 
@@ -80,16 +80,22 @@ class NERTagger:
 
         return False
 
-    def __checkWordStems(self, word, tagged_words, keys):
-        # stem word
-        # stemm keys
-        # get index where stem-word = stem-key
-        # append tagged_words with word, self.dictionary[keys[index where stem-word = stem-key]]
+    def __check_word_stems(self, word, tagged_words, keys):
+        stemmer = SnowballStemmer("english")
+        stemmed_word = stemmer.stem(word)
+        stemmed_keys = list(map(lambda x: stemmer.stem(x), keys)) # mb cache that?
+
+        if stemmed_word in stemmed_keys:
+            idx = stemmed_keys.index(stemmed_word)
+            tagged_words.append(Token(word, self.dictionary[keys[idx]]))
+            return True
+
         return False
 
 
 def main():
     if len(sys.argv) < 2:
+        nltk.download()
         input_file = "./../data/uebung4-training.iob"
         train_tagger(input_file)
         print('---- Training for NER-Tagger is finished ----')
@@ -163,7 +169,7 @@ def read_tokens_from_input_file(path):
 def write_annotations_to_file(annotations: List[Token], output_file):
     my_file = open(output_file, 'w')
     for token in annotations:
-        my_file.write("{} \t {}\n".format(token.value, token.tag))
+        my_file.write("{} {}\n".format(token.value, token.tag))
     my_file.close()
 
 
