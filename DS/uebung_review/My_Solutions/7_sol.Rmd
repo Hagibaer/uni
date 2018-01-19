@@ -1,0 +1,185 @@
+---
+title: "Exercise 7"
+subtitle: Business Analytics and Data Science WS16/17
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+# NEED FOR CHANGE ---- 
+# Note that this code will not work on your computer. 
+wdir <- "~/Seafile/lecture/BADS/Exercise BADS"
+setwd(wdir)
+
+# You can uncomment the next line and specify the directory for the exercise on your computer
+# wdir <- "C://Your/own/path"
+# End of NEED FOR CHANGE ----
+
+knitr::opts_knit$set(root.dir = wdir)
+# results = c("all", "hide")
+knitr::opts_chunk$set(echo = FALSE, results = 'all', message = FALSE, warning = FALSE, fig.keep = 'all', cache = FALSE)
+options(repos=c(CRAN = "https://cran.uni-muenster.de/"))
+```
+
+## Introduction
+You are now familiar with your first really complex machine learning model from the lecture: the artificial neural network. With some extensions and at a much larger size, this is the model that facilitates self-driving cars, digital assistants such as Siri, Cortana, etc., and humiliated famous Go players. In this tutorial, we use it to predict credit risk using  our loan data set. To find the best neural network, or at least the neural network with the optimal number of nodes, we will use the cross-validation loop from the previous tutorial to validate each of the parameter candidates.
+Later on, you will learn how to simplify the process and tune paramter with the **caret** package. We will also learn how to set up a parallel backend and parallelize code with **caret** and R in general for more speed.
+
+
+## Understanding artificial neural networks
+1. Load the data set loans and split into training and test set using a ratio of 80:20. 
+2. Use function **nnet() {nnet}** to train a neural net with one hidden layer and three nodes.
+3. Plot the structure of the neural network using **plot.nnet() {NeuralNetTools}**. Check out the *R is my Friend*  [blog](https://beckmw.wordpress.com/2013/11/14/visualizing-neural-networks-in-r-update/) for more advanced demos; e.g., how to augment to graph with connection weights 
+
+```{r}
+# Load the data set 
+if(!require("nnet")) install.packages("nnet"); library("nnet") # Try to load rpart, if it doesn't exist, then install and load it
+if(!require("caret")) install.packages("caret"); library("caret") # Try to load rpart, if it doesn't exist, then install and load it
+if(!require("ModelMetrics")) install.packages("ModelMetrics"); library("ModelMetrics") # Try to load rpart, if it doesn't exist, then install and load it
+# Link to the R script storing your function(s)
+source("BADS-HelperFunctions.R")
+loans <- get.loan.dataset()
+
+# Splitting the data into a test and a training set 
+set.seed(321)
+idx.train <- createDataPartition(y = loans$BAD, p = 0.8, list = FALSE) # Draw a random, stratified sample including p percent of the data
+tr_raw <- loans[idx.train, ] # training set
+ts_raw <-  loans[-idx.train, ] # test set (drop all observations with train indeces)
+
+# Train an artifical neural network with one hidden layer using nnet()
+nn_raw <- nnet(BAD~., data = tr_raw, # the data and formula to be used
+                  trace = FALSE, maxit = 1000, # general options
+                  size = 3, # the number of nodes in the model
+                  decay = 0.001) # regularization parameter similar to lambda in ridge regression
+
+# Make predictions as before
+lm <- glm(BAD~., data = tr_raw, family = binomial(link = "logit"))
+yhat <- list()
+yhat[["benchmark"]] <- predict(lm, newdata = ts_raw, type = "response")
+yhat[["nn_raw"]]   <- predict(nn_raw, newdata = ts_raw, type = "raw") # raw or class
+# We can do the same but create a nice plot with the the Hmeasure package
+library(hmeasure)
+h <- HMeasure(true.class = as.numeric(ts_raw$BAD)-1, scores = data.frame(yhat) )
+h$metrics["AUC"]
+
+# Standardize the data
+# Neural networks work better when the data inputs are on the same scale, e.g. standardized
+# Be careful to use the training mean/sd for normalization
+normalizer <- caret::preProcess(tr_raw, method = c("center", "scale"))
+tr <- predict(normalizer, newdata = tr_raw)
+ts <- predict(normalizer, newdata = ts_raw)
+
+nn <- nnet(BAD~., data = tr, trace = FALSE, maxit = 1000, size = 6, decay = 0) # regularization parameter similar to lambda in ridge regression
+yhat[["nn"]]   <- predict(nn, newdata = ts, type = "raw") # raw or class
+h <- HMeasure(true.class = as.numeric(ts_raw$BAD)-1, scores = data.frame(yhat) )
+h$metrics["AUC"]
+
+
+## Neural network structure
+# You can query the internal structure of the network using the **summary()** function
+summary(nn)
+
+# We can do better by using package NeuralNetTools
+if(!require("NeuralNetTools")) install.packages("NeuralNetTools"); library("NeuralNetTools")
+plotnet(nn, max_sp = TRUE)
+# Negative weights are colored grey, positive weights black,
+# with the thickness indicating weight size
+
+```
+
+```{r, include = FALSE}
+# Aside: Multiple class prediction
+# Train an artifical neural network with one hidden layer using nnet()
+nn <- nnet(RES~.-BAD, data = tr, # the data and formula to be used
+                  trace = FALSE, maxit = 1000, # general options
+                  size = 3, # the number of nodes in the model
+                  decay = 0.001) # regularization parameter similar to lambda in ridge regression
+
+# Plot this network with five output classes
+plotnet(nn, max_sp = TRUE)
+
+# Make predictions
+head(predict(nn, newdata = ts, type = "raw"), 5)
+# To make the predictions sum up to 1, the raw output
+# is put through another 'softmax' layer, which
+# is a k-dimensional version of the logit function
+# rescaling the ouput to fall between 0 and 1 and sum
+# up to 1.
+
+```
+
+
+## Tuning a neural network using cross-validation
+Neural networks are more complex than the models discussed until now, resulting in more parameters that must be selected. Since our training data is small, we employ cross-validation to use the full dataset for training and testing.
+
+1. Use function **cut()** to save a vector of indices that separate the training data into 5 folds of equal size.
+2. Initialize a vector **nnet.sizes** containing the *n* sizes for the neural network that you would like to compare, e.g. 3, 6, 9, 12, and 15 nodes, and the **m** weight decay parameters **decay**. Also initialize an empty *k*x*n* matrix to collect the results within the loop.
+3. It's time to put everything together. Write two for loops, one within the other, that do the following:    
+    - For each size candidate:
+        - For each fold:
+            - Train a model with size equal to the current size candidate on the other folds.
+            - Predict the outcomes for the current fold.
+            - Calculate the AUC value on the validation fold and save the result. Function **auc()** from package **ModelMetrics** does this quickly.
+4. Display the results for each tuning candidate in *n* boxplots.
+
+```{r}
+# The number of folds and the specific folds for cv
+k <- 5
+set.seed(321)
+folds <- cut(1:nrow(tr), breaks = k, labels = FALSE)
+folds <- sample(folds)
+
+### Specify the setup:
+# The number of nodes to try for the model
+nnet.param <- expand.grid("size" = seq(from = 3, to = 15, by = 3), "decay" = c(0.0001, 0.01, 1))
+# Initialize the data frame that collects the results
+results <- as.data.frame(matrix(NA, ncol = nrow(nnet.param), nrow = k))
+
+# Loop over different number of nodes, i.e. size of the neural network
+for(n in 1:nrow(nnet.param)){
+  # This is the cross-validation loop from before
+  for (i in 1:k) {
+    
+    # Give some feedback for teaching purposes only
+    if(n <= 3) message("Testing parameter candidates ", n, " of ", nrow(nnet.param), "(CV Test fold: ", i,")")
+    
+    # Split data into training and validation
+    idx.val <- which(folds == i, arr.ind = TRUE)
+    cv.train <- tr[-idx.val,]
+    cv.val <- tr[idx.val,]
+    # Train the neural network model with a number of nodes n
+    neuralnet <- nnet(BAD~., data = cv.train, # the data and formula to be used
+                      trace = FALSE, maxit = 100, # general options
+                      size = nnet.param$size[n], decay = nnet.param$decay[n]) # the number of nodes in the model
+    # Build and evaluate models using these partitions
+    yhat.val <- predict(neuralnet, newdata = cv.val, type = "raw")
+    # Calculate the AUC value with a function from package pROC
+    results[i, n] <- auc( as.numeric(cv.val$BAD)-1, as.vector(yhat.val))
+  }
+}
+
+head(results)
+nnet.param$avg_auc <- apply(results, 2, mean)
+nnet.param
+opt.auc <- which.max(nnet.param$avg_auc)
+nnet.param[opt.auc,]
+
+# Visualize the results in a boxplot 
+# with one boxplot for each column
+# tapply helps us summarize out the decay values
+size_results <- tapply(nnet.param$avg_auc, INDEX = nnet.param$size, mean)
+plot(x = names(size_results), y = size_results, 
+        xlab = "Number of nodes in hidden layer", ylab = "Area under the ROC curve (AUC)")
+
+# Compare performance on test set
+nn_tuned <- nnet(BAD~., data = tr, # the data and formula to be used
+                  trace = FALSE, maxit = 1000, # general options
+                  size = nnet.param$size[opt.auc], # the number of nodes in the model
+                  decay = nnet.param$decay[opt.auc]) # regularization parameter similar to lambda in ridge regression
+yhat[["nn_tuned"]]   <- predict(nn_tuned, newdata = ts, type = "raw") # raw or class
+
+h <- HMeasure(true.class = as.numeric(ts$BAD)-1, scores = data.frame(yhat) )
+h$metrics["AUC"]
+```
+
