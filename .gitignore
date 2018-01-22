@@ -1,2 +1,3 @@
-/.ipynb_checkpoints
-file.csv
+.RData
+.Rhistory
+.ipynb_checkpoints
