@@ -23,3 +23,7 @@ tasks that I will have to do.
 
      This module is dealing with n-dimensional data and how to get meaningful insights. The R code in this folder is mostly just auxillary code
      to check if the manual calculations have been correct.
+     
+5. Event Processing
+
+     Taken from the course description: This course will deal with common event models, languages for event processing, techniques to achieve robustness, and optimisations of event processing
